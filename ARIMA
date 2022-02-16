@@ -1,0 +1,122 @@
+clc;clear;
+warning off all
+data1=xlsread('data1.xlsx');
+num=132;
+data=data1(1:num,:);
+test1=data1(num+1:end,:);
+step=12;
+TempData=data;
+  output=data;
+TempData=detrend(TempData);  
+TrendData=data-TempData;
+figure;
+plot(TempData);
+[H,PValue,TestStat,CriticalValue] = adftest(TempData);
+difftime=0;
+SaveDiffData=[];
+while ~H
+
+    SaveDiffData=[SaveDiffData,TempData(1,1)];
+    TempData=diff(TempData);
+
+    difftime=difftime+1;
+
+    [H,PValue,TestStat,CriticalValue] = adftest(TempData);
+end
+test = [];
+for p = 0:5 
+    for q = 0:5
+        if(p + q ~= 0) 
+            m = armax(TempData,[p q]);      
+            AIC = aic(m);  
+            test = [test;p q AIC];
+        end
+    end
+end
+for k = 1:size(test,1)
+
+    if test(k,3) == min(test(:,3)) 
+        p_test = test(k,1);
+        q_test = test(k,2);
+        break;
+    end
+end
+disp('按照AIC值最小化原则选定的模型为')
+disp('ARIMA')
+disp([p_test difftime q_test]')
+m   = armax(TempData,[p_test q_test]);       
+ARIMA_Predict   = predict(m,TempData,step);
+ARIMA_Forcast   = forecast(m,TempData,step);
+PreR=[ARIMA_Predict' ARIMA_Forcast'];
+
+if size(SaveDiffData,2)~=0
+    for index=size(SaveDiffData,2):-1:1
+  
+        PreR=cumsum([SaveDiffData(index),PreR]);
+    end
+end
+TrendData=TrendData';
+mp1=polyfit(1:size(TrendData,2),TrendData,1);
+xt=[];
+for j=1:step
+    xt=[xt,size(TrendData,2)+j];
+end
+TrendResult=polyval(mp1,xt);
+ARIMAoutput=[TrendData,TrendResult]+PreR;
+ARIMAoutput_Predict=ARIMAoutput(1:end-step)';
+ARIMAoutput_Forcast=ARIMAoutput(end-step+1:end)';
+error=ARIMAoutput_Predict-output;
+pererror=error./output;
+averpererror=sum(abs(pererror))/length(pererror);
+RMSE  = sqrt(mean((error).^2));
+disp('2008年至2018年ARIMA模型预测平均绝对误差百分比MAPE');
+disp(averpererror)
+disp('2008年至2018年ARIMA模型预测均方根误差RMSE')
+disp(RMSE)
+disp('2019年预测')
+disp(ARIMAoutput_Forcast)
+figure
+plot(ARIMAoutput,':.','linewidth',2);
+hold on
+plot(data,'k--','linewidth',2);
+legend('预测值', '实际值','Location','NorthWest')
+title('ARIMA模型预测')
+xlabel('时间')
+ylabel('结果')
+axis tight
+hold off
+%-------------------------------------------------------------------------------------
+figure
+subplot(2,1,1)
+autocorr(data)
+subplot(2,1,2)
+parcorr(data)
+%-------------------------------------------------------------------------------------
+figure()
+plot(pererror,'-.','linewidth',2)                
+legend('ARIMA模型预测相对误差','Location','NorthEast','FontName','华文宋体')
+title('ARIMA模型相对误差图','fontsize',12,'FontName','华文宋体')
+ylabel('误差','fontsize',12,'FontName','华文宋体')
+xlabel('样本','fontsize',12,'FontName','华文宋体')
+axis tight
+%-------------------------------------------------------------------------------------
+figure();
+histogram(error);
+title(['Error Mean = ' num2str(mean(error)) ', Error StD = ' num2str(std(error))]);
+xlabel('Error Histogram');
+%-----------------------------------------------------------------------
+num1=12;
+mse1 = sqrt(sum((test1- ARIMAoutput_Forcast).^2)) ./ num1;
+mae1 = mean(abs(test1- ARIMAoutput_Forcast));
+rmse1 = sqrt(mean((ARIMAoutput_Forcast-test1).^2));
+R1 = 1 - (sum((ARIMAoutput_Forcast-test1).^2) / sum((test1- mean(test1)).^2));
+disp(['2019年预测发病率均方误差MSE为：',num2str(mse1)])
+disp(['2019年预测发病率平均绝对误差MAE为：',num2str(mae1)])
+disp(['2019年预测发病率均方根误差RMSE为：',num2str(rmse1)])
+disp(['2019年预测发病率决定系数为：',num2str(R1)])
+figure;
+plot(test1,'r');
+hold on;
+plot(ARIMAoutput_Forcast,'b');
+
+
