@@ -1,0 +1,104 @@
+clc;clear;
+data1=xlsread('data8.xlsx');
+data1=data1/10;
+num=132;
+data=data1(1:num,:);
+test1=data1(num+1:num+12,:);
+y = log(data);
+T = length(y);
+%-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Mdl = arima('Constant',0,'D',1,'Seasonality',12,...
+              'MALags',1,'SMALags',12);          
+EstMdl = estimate(Mdl,y);
+res = infer(EstMdl,y);
+stres = res/sqrt(EstMdl.Variance);
+figure(1);
+qqplot(stres)
+%-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+subplot(2,1,1)
+autocorr(stres)
+subplot(2,1,2)
+parcorr(stres)
+[h,p] = lbqtest(stres,'lags',[5,10,15],'dof',[3,8,13]);
+%----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+yfit=y-res;
+yfit2008=exp(yfit);
+y2008=exp(y);
+resinput=y2008-yfit2008;
+resinput=resinput(14:end);
+a=14;
+xtrianres=resinput(1:end-a);
+ytrainres=resinput(a+1:end);
+mu = mean(resinput);
+sig = std(resinput);
+XTrain = (xtrianres - mu) / sig;
+XTrain=XTrain';%
+YTrain = (ytrainres - mu) / sig;
+YTrain=YTrain';
+numFeatures = 1;
+numResponses = 1;
+numHiddenUnits =90*3;
+
+layers = [ ...
+    sequenceInputLayer(numFeatures)
+    lstmLayer(numHiddenUnits)
+    fullyConnectedLayer(numResponses)
+    regressionLayer];
+options = trainingOptions('adam', ...
+    'MaxEpochs',500, ...
+    'GradientThreshold',1, ...
+    'InitialLearnRate',0.005, ...
+    'LearnRateSchedule','piecewise', ...
+    'LearnRateDropPeriod',100, ...
+    'LearnRateDropFactor',0.2, ...
+    'Verbose',0, ...
+    'Plots','training-progress');
+net = trainNetwork(XTrain,YTrain,layers,options);
+dataTrainStandardized = (resinput - mu) / sig;
+dataTrainStandardized=dataTrainStandardized';
+Ytrainres=predict(net,dataTrainStandardized);
+Ytrainres=Ytrainres';
+trainresoutput=Ytrainres(1:end-a);
+testresoutput=Ytrainres(end-a+1:end-a+12);
+Mdl1 = estimate(Mdl,y);
+yF1  = forecast(Mdl1,12,'Y0',y);
+res2=test1-yF1;
+yF11=exp(yF1);
+yfit2008_2018=yfit2008(14+a:end)+trainresoutput;
+y2008_2018=y2008(14+a:end);
+yF1=yF11+testresoutput;
+figure(10);
+plot(yfit2008_2018,'r--','LineWidth',1.5);
+hold on;
+plot(y2008_2018,'b','LineWidth',2);
+title('2008-2018年LSTM_SARIMA组合模型拟合艾滋病发病率曲线')
+legend('拟合值','真实值','Location','NorthWest')
+num2=length(y2008_2018);
+mse2 = sqrt(sum((y2008_2018-yfit2008_2018).^2)) ./ num2;
+mae2 = mean(abs(y2008_2018-yfit2008_2018));
+rmse2= sqrt(mean((yfit2008_2018-y2008_2018).^2));
+R2 = 1 - (sum((yfit2008_2018-y2008_2018).^2) / sum((y2008_2018- mean(y2008_2018)).^2));
+disp(['2008-2018年LSTM_sarima组合模型预测发病率均方误差MSE为：',num2str(mse2)])
+disp(['2008-2018年预测发病率平均绝对误差MAE为：',num2str(mae2)])
+disp(['2008-2018年预测发病率均方根误差RMSE为：',num2str(rmse2)])
+disp(['2008-2018年预测发病率决定系数为：',num2str(R2)])
+figure(11);
+plot(yF1,'r--','LineWidth',1.5)
+hold on
+plot(test1,'b','LineWidth',2)
+axis tight
+title('2019年LSTM_sarima组合模型预测艾滋病发病率曲线')
+legend('预测值','真实值','Location','NorthWest')
+hold off
+%------------------------------------------------------------------------------
+num1=12;
+mse1 = sqrt(sum((test1-yF1).^2)) ./ num1;
+mae1 = mean(abs(test1- yF1));
+rmse1 = sqrt(mean((yF1-test1).^2));
+R1 = 1 - (sum((yF1-test1).^2) / sum((test1- mean(test1)).^2));
+disp(['2019年LSTM_sarima组合模型预测发病率均方误差MSE为：',num2str(mse1)])
+disp(['2019年LSTM_sarima组合模型预测发病率平均绝对误差MAE为：',num2str(mae1)])
+disp(['2019年LSTM_sarima组合模型预测发病率均方根误差RMSE为：',num2str(rmse1)])
+disp(['2019年LSTM_sarima组合模型预测发病率决定系数为：',num2str(R1)])
+%save filename15.mat
+
