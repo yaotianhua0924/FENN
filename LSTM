@@ -1,0 +1,68 @@
+clc;
+clear;
+data=xlsread('data1.xlsx');
+data=data(:,1)';
+figure
+plot(data)
+xlabel("Month")
+ylabel("Cases")
+title("Monthly Cases of Chickenpox")
+a=12;
+numTimeStepsTrain = floor(numel(data(1:132)));
+dataTrain = data(1:numTimeStepsTrain);
+dataTest = data(numTimeStepsTrain+1:end);
+inputdata=data(end-a-11:end-a);
+mu = mean(dataTrain);
+sig = std(dataTrain);
+dataTrainStandardized = (dataTrain - mu) / sig;
+inputdataStandardized= (inputdata - mu) / sig;
+XTrain = dataTrainStandardized(1:end-a);
+YTrain = dataTrainStandardized(a+1:end);
+load filename2.mat
+Ytrain=predict(net,dataTrainStandardized);
+Ytrain= sig*Ytrain + mu;
+Ytrain=Ytrain(1:end-a);
+datetrain=dataTrain(a+1:end);
+figure(5);
+plot(Ytrain,'r--','LineWidth',1.5);
+hold on;
+plot(datetrain,'b','LineWidth',2);
+title('2008-2018年SARIMA模型拟合丙肝发病率曲线')
+legend('拟合值','真实值','Location','NorthWest')
+num2=length(Ytrain);
+mse2 = sqrt(sum((datetrain-Ytrain).^2)) ./ num2;
+mae2 = mean(abs(datetrain-Ytrain));
+rmse2= sqrt(mean((Ytrain-datetrain).^2));
+R2 = 1 - (sum((Ytrain-datetrain).^2) / sum((datetrain- mean(datetrain)).^2));
+disp(['2008-2018年预测发病率均方误差MSE为：',num2str(mse2)])
+disp(['2008-2018年预测发病率平均绝对误差MAE为：',num2str(mae2)])
+disp(['2008-2018年预测发病率均方根误差RMSE为：',num2str(rmse2)])
+disp(['2008-2018年预测发病率决定系数为：',num2str(R2)])
+%---------------------------------------------------------------------------------------------------------------
+YPred=predict(net,inputdataStandardized);
+YPred = sig*YPred + mu;
+figure(6)
+subplot(2,1,1)
+plot(dataTest,'b','LineWidth',2)
+hold on
+plot(YPred,'r--','LineWidth',1.5)
+hold off
+legend(["Observed" "Forecast"])
+ylabel("Cases")
+title("Forecast")
+subplot(2,1,2)
+stem(YPred - dataTest)
+xlabel("Month")
+ylabel("Error")
+rmse = sqrt(mean((YPred-dataTest).^2));
+title("RMSE = " + rmse)
+num1=12;
+mse1 = sqrt(sum((dataTest-YPred).^2)) ./ num1;
+mae1 = mean(abs(dataTest-YPred));
+rmse1 = sqrt(mean((YPred-dataTest).^2));
+R1 = 1 - (sum((YPred-dataTest).^2) / sum((dataTest- mean(dataTest)).^2));
+disp(['2019年预测发病率均方误差MSE为：',num2str(mse1)])
+disp(['2019年预测发病率平均绝对误差MAE为：',num2str(mae1)])
+disp(['2019年预测发病率均方根误差RMSE为：',num2str(rmse1)])
+disp(['2019年预测发病率决定系数为：',num2str(R1)])
+%save filename2.mat
