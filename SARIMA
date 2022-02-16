@@ -1,0 +1,84 @@
+clc;clear;
+data1=xlsread('data1.xlsx');
+num=132;
+data=data1(1:num,:);
+test1=data1(num+1:end,:);
+y = log(data);
+T = length(y);
+Mdl = arima('Constant',0,'D',1,'Seasonality',12,...
+              'MALags',1,'SMALags',12);          
+EstMdl = estimate(Mdl,y);
+res = infer(EstMdl,y);
+stres = res/sqrt(EstMdl.Variance);
+figure(1);
+qqplot(stres)
+figure(2);
+x = -4:.05:4;
+[f,xi] = ksdensity(stres);
+subplot(1,2,2)
+plot(xi,f,'k','LineWidth',2);
+hold on
+plot(x,normpdf(x),'r--','LineWidth',2)
+legend('Standardized Residuals','Standard Normal')
+hold off
+subplot(2,1,1)
+autocorr(stres)
+subplot(2,1,2)
+parcorr(stres)
+[h,p] = lbqtest(stres,'lags',[5,10,15],'dof',[3,8,13]);
+%-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+yfit=y-res;
+yfit2008=exp(yfit);
+y2008=exp(y);
+figure(4);
+plot(yfit2008,'r--','LineWidth',1.5);
+hold on;
+plot(y2008,'b','LineWidth',2);
+set(gca,'XTick',1:12:133);
+set(gca,'xtick',[1,13,25,37,49,61,73,85,97,109,121,133],'xticklabel',{'2008Jan','2009Jan','2010Jan','2011Jan',...
+    '2012Jan','2013Jan','2014Jan','2015Jan','2016Jan','2017Jan','2018Jan','2019Jan'});
+box off;
+xlabel('month');
+ylabel('Incidence rate (per million)');
+
+title('2008-2018Sarima model fitted the incidence curve of hepatitis C')
+legend('Sarima','Actual incidence', 'Location','NorthWest')
+Mdl1 = estimate(Mdl,y);
+yF1  = forecast(Mdl1,12,'Y0',y);
+yF1=exp(yF1);
+res2=test1-yF1;
+%-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+figure
+plot(yF1,'r--','LineWidth',1.5)
+hold on
+plot(test1,'b','LineWidth',2)
+axis tight
+title('2019年SARIMA预测丙肝发病率曲线')
+legend('预测值','真实值','Location','NorthWest')
+hold off
+%------------------------------------------------------------------------------
+num1=12;
+mse1 = sqrt(sum((test1-yF1).^2)) ./ num1;
+mae1 = mean(abs(test1- yF1));
+rmse1 = sqrt(mean((yF1-test1).^2));
+R1 = 1 - (sum((yF1-test1).^2) / sum((test1- mean(test1)).^2));
+disp(['2019年预测发病率均方误差MSE为：',num2str(mse1)])
+disp(['2019年预测发病率平均绝对误差MAE为：',num2str(mae1)])
+disp(['2019年预测发病率均方根误差RMSE为：',num2str(rmse1)])
+disp(['2019年预测发病率决定系数为：',num2str(R1)])
+%------------------------------------------------------------------------------
+yfit1=yfit2008(14:end,:);
+y1=y2008(14:end,:);
+num2=length(y1);
+mse2= sqrt(sum((y1-yfit1).^2)) ./ num2;
+mae2 = mean(abs(y1- yfit1));
+rmse2= sqrt(mean((yfit1-y1).^2));
+R2 = 1 - (sum((yfit1-y1).^2) / sum((y1-mean(y1)).^2));
+disp(['2008-2018年拟合发病率均方误差MSE为：',num2str(mse2)])
+disp(['2008-2018年拟合发病率平均绝对误差MAE为：',num2str(mae2)])
+disp(['2008-2018年拟合发病率均方根误差RMSE为：',num2str(rmse2)])
+disp(['2008-2018年拟合发病率决定系数为：',num2str(R2)])
+
+
+
+
